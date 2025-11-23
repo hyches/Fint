@@ -1,0 +1,5 @@
+{
+  "name": "Fint_Working_Dev",
+  "description": "An intelligent application that uses Gemini to help generate financial statements from a trial balance. Upload your data, map accounts with AI assistance, and view your P&L and Balance Sheet.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,919 @@
+
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinTech Pro - Liquid Glass</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['SF Pro Display', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          },
+          colors: {
+            glass: {
+              light: 'rgba(255, 255, 255, 0.4)',
+              dark: 'rgba(15, 23, 42, 0.6)',
+              border: 'rgba(255, 255, 255, 0.2)',
+            },
+            accent: '#2563eb',
+          },
+          animation: {
+            'blob': 'blob 10s infinite',
+          },
+          keyframes: {
+            blob: {
+              '0%': { transform: 'translate(0px, 0px) scale(1)' },
+              '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+              '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+              '100%': { transform: 'translate(0px, 0px) scale(1)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Dependencies -->
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.2.4/dexie.min.js"></script>
+
+  <!-- Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body { overflow: hidden; }
+    
+    /* Liquid Background */
+    .liquid-bg {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
+      background: linear-gradient(to bottom right, #eef2ff, #e0e7ff);
+      transition: background 0.5s ease;
+    }
+    .dark .liquid-bg {
+      background: linear-gradient(to bottom right, #0f172a, #1e293b);
+    }
+    .blob {
+      position: absolute; filter: blur(80px); opacity: 0.6; border-radius: 50%;
+      animation: blob 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .blob-1 { top: -10%; left: -10%; width: 40vw; height: 40vw; background: #60a5fa; }
+    .blob-2 { bottom: -10%; right: -10%; width: 40vw; height: 40vw; background: #818cf8; animation-delay: -5s; }
+    .dark .blob-1 { background: #1d4ed8; opacity: 0.4; }
+    .dark .blob-2 { background: #4338ca; opacity: 0.4; }
+
+    /* Glassmorphism */
+    .glass {
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+    }
+    .dark .glass {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    
+    .glass-card {
+      background: rgba(255, 255, 255, 0.3);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      transition: all 0.3s ease;
+    }
+    .dark .glass-card {
+      background: rgba(30, 41, 59, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .glass-card:hover {
+      transform: translateY(-4px);
+      background: rgba(255, 255, 255, 0.5);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+    }
+    .dark .glass-card:hover {
+      background: rgba(30, 41, 59, 0.6);
+    }
+
+    .glass-input {
+      background: rgba(255, 255, 255, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      color: #1e293b;
+    }
+    .dark .glass-input {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #f1f5f9;
+    }
+    .glass-input:focus {
+      background: rgba(255, 255, 255, 0.8);
+      outline: none; 
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+    }
+    .dark .glass-input:focus {
+      background: rgba(0, 0, 0, 0.4);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.8); }
+
+    /* Print */
+    @media print {
+      .no-print, .liquid-bg { display: none !important; }
+      .print-container { width: 100%; max-width: none; box-shadow: none; margin: 0; background: white !important; color: black !important; }
+      .glass, .glass-card { background: white !important; backdrop-filter: none; border: none; box-shadow: none; color: black !important; }
+      body { overflow: visible; background: white; color: black; }
+      .page-break { page-break-before: always; }
+    }
+  </style>
+</head>
+<body class="text-slate-800 dark:text-slate-100 transition-colors duration-300">
+  <div class="liquid-bg">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+  </div>
+
+  <div id="root" class="h-full flex flex-col relative z-10"></div>
+
+  <script type="module">
+// <![CDATA[
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+// --- SECURITY SERVICE ---
+const SecurityService = {
+    async getKey() {
+        let keyJson = localStorage.getItem('fin_sec_key_v2');
+        if (!keyJson) {
+            const key = await window.crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+            const exported = await window.crypto.subtle.exportKey("jwk", key);
+            localStorage.setItem('fin_sec_key_v2', JSON.stringify(exported));
+            return key;
+        }
+        return window.crypto.subtle.importKey("jwk", JSON.parse(keyJson), { name: "AES-GCM" }, true, ["encrypt", "decrypt"]);
+    },
+    async encrypt(data) {
+        if(!data) return null;
+        try {
+            const key = await this.getKey();
+            const iv = window.crypto.getRandomValues(new Uint8Array(12));
+            const encoded = new TextEncoder().encode(JSON.stringify(data));
+            const encrypted = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
+            return JSON.stringify({ iv: Array.from(iv), data: Array.from(new Uint8Array(encrypted)) });
+        } catch (e) { console.error("Enc Err", e); return null; }
+    },
+    async decrypt(wrapperStr) {
+        if(!wrapperStr) return null;
+        try {
+            let wrapper;
+            try { wrapper = JSON.parse(wrapperStr); } catch(e) { return wrapperStr; } // Legacy support
+            if(!wrapper.iv || !wrapper.data) return wrapper; 
+            const key = await this.getKey();
+            const decrypted = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(wrapper.iv) }, key, new Uint8Array(wrapper.data));
+            return JSON.parse(new TextDecoder().decode(decrypted));
+        } catch (e) { console.error("Dec Err", e); return null; }
+    }
+};
+
+// --- CONSTANTS ---
+const STATEMENT_STRUCTURE = [
+  { name: 'Cash and Cash Equivalents', type: 'Asset', subHeads: ['Current Assets'], majorHead: 'Financial Assets' },
+  { name: 'Trade Receivables', type: 'Asset', subHeads: ['Current Assets', 'Non-current Assets'], majorHead: 'Financial Assets' },
+  { name: 'Loans', type: 'Asset', subHeads: ['Current Assets', 'Non-current Assets'], majorHead: 'Financial Assets' },
+  { name: 'Investments', type: 'Asset', subHeads: ['Current Assets', 'Non-current Assets'], majorHead: 'Financial Assets' },
+  { name: 'Other Financial Assets', type: 'Asset', subHeads: ['Current Assets', 'Non-current Assets'], majorHead: 'Financial Assets' },
+  { name: 'Inventories', type: 'Asset', subHeads: ['Current Assets'], majorHead: 'Non-financial Assets' },
+  { name: 'Current Tax Assets (Net)', type: 'Asset', subHeads: ['Current Assets', 'Non-current Assets'], majorHead: 'Non-financial Assets' },
+  { name: 'Investment Property', type: 'Asset', subHeads: ['Non-current Assets'], majorHead: 'Non-financial Assets' },
+  { name: 'Property, Plant, and Equipment', type: 'Asset', subHeads: ['Non-current Assets'], majorHead: 'Non-financial Assets' },
+  { name: 'Other Intangible Assets', type: 'Asset', subHeads: ['Non-current Assets'], majorHead: 'Non-financial Assets' },
+  { name: 'Other Non-current Assets', type: 'Asset', subHeads: ['Non-current Assets'], majorHead: 'Non-financial Assets' },
+  { name: 'Trade Payables', type: 'Liability', subHeads: ['Current Liabilities', 'Non-current Liabilities'], majorHead: 'Financial Liabilities' },
+  { name: 'Borrowings (Other than Debt Securities)', type: 'Liability', subHeads: ['Current Liabilities', 'Non-current Liabilities'], majorHead: 'Financial Liabilities' },
+  { name: 'Other Financial Liabilities', type: 'Liability', subHeads: ['Current Liabilities', 'Non-current Liabilities'], majorHead: 'Financial Liabilities' },
+  { name: 'Provisions', type: 'Liability', subHeads: ['Current Liabilities', 'Non-current Liabilities'], majorHead: 'Non-Financial Liabilities' },
+  { name: 'Deferred Tax Liabilities (Net)', type: 'Liability', subHeads: ['Non-current Liabilities'], majorHead: 'Non-Financial Liabilities' },
+  { name: 'Other Non-current Liabilities', type: 'Liability', subHeads: ['Current Liabilities', 'Non-current Liabilities'], majorHead: 'Non-Financial Liabilities' },
+  { name: 'Equity Share Capital', type: 'Equity', subHeads: ['Equity'], majorHead: 'Equity' },
+  { name: 'Other Equity', type: 'Equity', subHeads: ['Equity'], majorHead: 'Equity' },
+  { name: 'Interest Income', type: 'Income', subHeads: ['Revenue from Operations'], majorHead: 'Revenue' },
+  { name: 'Dividend Income', type: 'Income', subHeads: ['Revenue from Operations'], majorHead: 'Revenue' },
+  { name: 'Rental Income', type: 'Income', subHeads: ['Revenue from Operations'], majorHead: 'Revenue' },
+  { name: 'Fees and Commission Income', type: 'Income', subHeads: ['Revenue from Operations'], majorHead: 'Revenue' },
+  { name: 'Capital Gains Realised', type: 'Income', subHeads: ['Revenue from Operations'], majorHead: 'Revenue' },
+  { name: 'Fair Value Changes (M2M) - unrealised', type: 'Income', subHeads: ['Revenue from Operations'], majorHead: 'Revenue' },
+  { name: 'Other Revenue from Operations', type: 'Income', subHeads: ['Revenue from Operations'], majorHead: 'Revenue' },
+  { name: 'Other Income', type: 'Income', subHeads: ['Other Income'], majorHead: 'Revenue' },
+  { name: 'Finance Costs', type: 'Expense', subHeads: ['Expenses'], majorHead: 'Expenses' },
+  { name: 'Fees and Commission Expense', type: 'Expense', subHeads: ['Expenses'], majorHead: 'Expenses' },
+  { name: 'Changes in Inventories of Finished Goods, Stock-in-Trade, and Work-in-Progress', type: 'Expense', subHeads: ['Expenses'], majorHead: 'Expenses' },
+  { name: 'Employee Benefits Expense', type: 'Expense', subHeads: ['Expenses'], majorHead: 'Expenses' },
+  { name: 'Depreciation, Amortization, and Impairment', type: 'Expense', subHeads: ['Expenses'], majorHead: 'Expenses' },
+  { name: 'Other Expenses', type: 'Expense', subHeads: ['Expenses'], majorHead: 'Expenses' },
+  { name: 'Management Fees', type: 'Expense', subHeads: ['Expenses'], majorHead: 'Expenses' }
+];
+
+const PNL_STRUCTURE = [
+    { id: 'pnl-rev', particulars: 'Revenue from Operations', isHeader: true, rom: 'I'},
+    { id: 'pnl-rev-int', particulars: 'Interest Income', noteKey: 'Interest Income', level: 1, item: '(i)' },
+    { id: 'pnl-rev-div', particulars: 'Dividend Income', noteKey: 'Dividend Income', level: 1, item: '(ii)' },
+    { id: 'pnl-rev-rent', particulars: 'Rental Income', noteKey: 'Rental Income', level: 1, item: '(iii)' },
+    { id: 'pnl-rev-fees', particulars: 'Fees and Commission Income', noteKey: 'Fees and Commission Income', level: 1, item: '(iv)' },
+    { id: 'pnl-rev-cg', particulars: 'Capital Gains Realised', noteKey: 'Capital Gains Realised', level: 1, item: '(v)' },
+    { id: 'pnl-rev-m2m', particulars: 'Fair Value Changes (M2M) - unrealised', noteKey: 'Fair Value Changes (M2M) - unrealised', level: 1, item: '(vi)' },
+    { id: 'pnl-rev-other', particulars: 'Other Revenue from Operations', noteKey: 'Other Revenue from Operations', level: 1, item: '(vii)' },
+    { id: 'pnl-total-rev', particulars: 'Total Revenue from Operations', isTotal: true, isHeader: false, children: ['pnl-rev-int', 'pnl-rev-div', 'pnl-rev-rent', 'pnl-rev-fees', 'pnl-rev-cg', 'pnl-rev-m2m', 'pnl-rev-other'] },
+    { id: 'pnl-other-inc', particulars: 'Other Income', noteKey: 'Other Income', isHeader: true, rom: 'II' },
+    { id: 'pnl-total-inc', particulars: 'Total Income (I+II)', isTotal: true, isHeader: true, rom: 'III', children: ['pnl-total-rev', 'pnl-other-inc'] },
+    { id: 'pnl-exp', particulars: 'Expenses', isHeader: true, rom: 'IV' },
+    { id: 'pnl-exp-fin', particulars: 'Finance Costs', noteKey: 'Finance Costs', level: 1, item: '(i)' },
+    { id: 'pnl-exp-fees', particulars: 'Fees and Commission Expense', noteKey: 'Fees and Commission Expense', level: 1, item: '(ii)' },
+    { id: 'pnl-exp-inv', particulars: 'Changes in Inventories of Finished Goods, Stock-in-Trade, and Work-in-Progress', noteKey: 'Changes in Inventories of Finished Goods, Stock-in-Trade, and Work-in-Progress', level: 1, item: '(iii)' },
+    { id: 'pnl-exp-emp', particulars: 'Employee Benefits Expenses', noteKey: 'Employee Benefits Expense', level: 1, item: '(iv)' },
+    { id: 'pnl-exp-dep', particulars: 'Depreciation, Amortization, and Impairment', noteKey: 'Depreciation, Amortization, and Impairment', level: 1, item: '(v)' },
+    { id: 'pnl-exp-oth', particulars: 'Other Expenses', noteKey: 'Other Expenses', level: 1, item: '(vi)' },
+    { id: 'pnl-exp-mgmt', particulars: 'Management Fees', noteKey: 'Management Fees', level: 1, item: '(vii)' },
+    { id: 'pnl-total-exp', particulars: 'Total Expenses', isTotal: true, isHeader: false, children: ['pnl-exp-fin','pnl-exp-fees', 'pnl-exp-inv', 'pnl-exp-emp', 'pnl-exp-dep', 'pnl-exp-oth', 'pnl-exp-mgmt'] },
+    { id: 'pnl-pbt', particulars: 'Profit / (Loss) Before Exceptional Items and Tax (III - IV)', isTotal: true, isHeader: true, rom: 'V', calc: (items) => (items['pnl-total-inc'] || 0) - (items['pnl-total-exp'] || 0) },
+    { id: 'pnl-exp-items', particulars: 'Exceptional Items', isHeader: true, rom: 'VI' },
+    { id: 'pnl-pbt-final', particulars: 'Profit / (Loss) Before Tax (V - VI)', isTotal: true, isHeader: true, rom: 'VII', calc: (items) => (items['pnl-pbt'] || 0) - (items['pnl-exp-items'] || 0)},
+    { id: 'pnl-tax', particulars: 'Tax Expenses', noteKey: 'Tax Expenses', isHeader: true, rom: 'VIII' },
+    { id: 'pnl-pat', particulars: 'Profit / (Loss) for the Period from Continuing Operations (VII - VIII)', isTotal: true, isHeader: true, rom: 'IX', calc: (items) => (items['pnl-pbt-final'] || 0) - (items['pnl-tax'] || 0)},
+];
+
+const BS_STRUCTURE = [
+    { id: 'bs-assets-header', particulars: 'ASSETS', isHeader: true, level: -1, rom: 'I' },
+    { id: 'bs-fin-assets', particulars: 'Financial Assets', isHeader: true, level: 0, item: '1' },
+    { id: 'bs-cash', particulars: 'Cash and cash equivalents', noteKey: 'Cash and Cash Equivalents', level: 1, item: '(a)' },
+    { id: 'bs-receivables-header', particulars: 'Receivables', level: 1, item: '(b)' },
+    { id: 'bs-receivables', particulars: 'Trade Receivables', noteKey: 'Trade Receivables', level: 2, item: '(i)' },
+    { id: 'bs-loans', particulars: 'Loans', noteKey: 'Loans', level: 1, item: '(c)' },
+    { id: 'bs-investments', particulars: 'Investments', noteKey: 'Investments', level: 1, item: '(d)' },
+    { id: 'bs-other-fin-assets', particulars: 'Other Financial assets', noteKey: 'Other Financial Assets', level: 1, item: '(e)' },
+    { id: 'bs-non-fin-assets', particulars: 'Non-financial Assets', isHeader: true, level: 0, item: '2' },
+    { id: 'bs-inventories', particulars: 'Inventories', noteKey: 'Inventories', level: 1, item: '(a)' },
+    { id: 'bs-tax-assets', particulars: 'Current tax assets (Net)', noteKey: 'Current Tax Assets (Net)', level: 1, item: '(b)' },
+    { id: 'bs-inv-prop', particulars: 'Investment Property', noteKey: 'Investment Property', level: 1, item: '(c)' },
+    { id: 'bs-ppe', particulars: 'Property, Plant, and Equipment', noteKey: 'Property, Plant, and Equipment', level: 1, item: '(d)' },
+    { id: 'bs-intangible', particulars: 'Other Intangible assets', noteKey: 'Other Intangible Assets', level: 1, item: '(e)' },
+    { id: 'bs-other-non-curr-assets', particulars: 'Other non-current assets', noteKey: 'Other Non-current Assets', level: 1, item: '(f)' },
+    { id: 'bs-total-assets', particulars: 'Total Assets', isTotal: true, isHeader: true, children: ['bs-cash', 'bs-receivables', 'bs-loans', 'bs-investments', 'bs-other-fin-assets', 'bs-inventories', 'bs-tax-assets', 'bs-inv-prop', 'bs-ppe', 'bs-intangible', 'bs-other-non-curr-assets'] },
+    { id: 'bs-le-header', particulars: 'LIABILITIES AND EQUITY', isHeader: true, level: -1, rom: 'II' },
+    { id: 'bs-liab-header', particulars: 'LIABILITIES', isHeader: true, level: -1 },
+    { id: 'bs-fin-liab', particulars: 'Financial Liabilities', isHeader: true, level: 0, item: '1' },
+    { id: 'bs-payables-header', particulars: 'Payables', level: 1, item: '(a)'},
+    { id: 'bs-payables', particulars: 'Trade Payables', noteKey: 'Trade Payables', level: 2, item: '(i)'},
+    { id: 'bs-borrowings', particulars: 'Borrowings (Other than Debt Securities)', noteKey: 'Borrowings (Other than Debt Securities)', level: 1, item: '(b)' },
+    { id: 'bs-other-fin-liab', particulars: 'Other financial liabilities', noteKey: 'Other Financial Liabilities', level: 1, item: '(c)' },
+    { id: 'bs-non-fin-liab', particulars: 'Non-Financial Liabilities', isHeader: true, level: 0, item: '2' },
+    { id: 'bs-provisions', particulars: 'Provisions', noteKey: 'Provisions', level: 1, item: '(a)' },
+    { id: 'bs-def-tax-liab', particulars: 'Deferred tax liabilities (Net)', noteKey: 'Deferred Tax Liabilities (Net)', level: 1, item: '(b)' },
+    { id: 'bs-other-non-fin-liab', particulars: 'Other non-financial liabilities', noteKey: 'Other Non-current Liabilities', level: 1, item: '(c)' },
+    { id: 'bs-equity-header', particulars: 'EQUITY', isHeader: true, level: 0, item: '3' },
+    { id: 'bs-share-cap', particulars: 'Equity Share capital', noteKey: 'Equity Share Capital', level: 1, item: '(a)' },
+    { id: 'bs-other-equity', particulars: 'Other Equity', noteKey: 'Other Equity', level: 1, item: '(b)' },
+    { id: 'bs-total-le', particulars: 'Total Liabilities and Equity', isTotal: true, isHeader: true, calc: (items) => (items['bs-payables'] || 0) + (items['bs-borrowings'] || 0) + (items['bs-other-fin-liab'] || 0) + (items['bs-provisions'] || 0) + (items['bs-def-tax-liab'] || 0) + (items['bs-other-non-fin-liab'] || 0) + (items['bs-share-cap'] || 0) + (items['bs-other-equity'] || 0) },
+];
+
+// --- DB ---
+const db = new Dexie('FinPlatformSecureV2');
+db.version(1).stores({
+  entities: '++id, name',
+  periods: '++id, entityId, name, type',
+  trialBalances: '++id, periodId',
+  groupings: '++id, entityId', 
+  mappings: '++id, entityId',
+  budgets: '++id, [entityId+periodId]',
+  misNotes: '++id, [periodId+noteKey]'
+});
+
+const Icon = ({ name, className }) => React.createElement("span", { className: `material-icons-outlined select-none ${className}` }, name);
+
+// --- ENTITY SELECTOR ---
+const EntitySelector = ({ onSelect, onConsolidate }) => {
+    const [list, setList] = useState([]);
+    const [isAdd, setIsAdd] = useState(false);
+    const [name, setName] = useState('');
+
+    useEffect(() => { db.entities.toArray().then(setList); }, []);
+
+    const create = async () => {
+        if(!name) return;
+        await db.entities.add({ name });
+        setName(''); setIsAdd(false); 
+        db.entities.toArray().then(setList);
+    };
+
+    const del = async (e, id) => {
+        e.stopPropagation();
+        if(confirm('Delete Entity? All data will be lost.')) {
+            await db.entities.delete(id);
+            db.entities.toArray().then(setList);
+        }
+    }
+
+    return React.createElement("div", { className: "min-h-screen flex flex-col items-center justify-center p-6" },
+        React.createElement("div", { className: "glass w-full max-w-5xl p-12 rounded-[3rem] shadow-2xl" },
+            React.createElement("div", { className: "flex justify-between items-end mb-10" },
+                React.createElement("div", null,
+                    React.createElement("h1", { className: "text-5xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-300" }, "FinTech Pro"),
+                    React.createElement("p", { className: "text-slate-500 dark:text-slate-400 text-lg" }, "Secure Multi-Entity Financial Platform")
+                ),
+                React.createElement("button", { onClick: onConsolidate, className: "glass-card px-6 py-3 rounded-2xl font-bold text-slate-700 dark:text-slate-200 hover:bg-white/50 flex items-center gap-2" }, React.createElement(Icon, { name: "pie_chart" }), "Consolidated Reports")
+            ),
+            React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-8" },
+                list.map(e => 
+                    React.createElement("div", { key: e.id, onClick: () => onSelect(e), className: "glass-card p-8 rounded-3xl cursor-pointer group relative overflow-hidden" },
+                        React.createElement("button", { onClick: (ev) => del(ev, e.id), className: "absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-red-500" }, React.createElement(Icon, { name: "delete" })),
+                        React.createElement("div", { className: "w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 transition-transform" }, 
+                            React.createElement(Icon, { name: "business", className: "text-3xl" })
+                        ),
+                        React.createElement("h3", { className: "font-bold text-2xl mb-2" }, e.name),
+                        React.createElement("div", { className: "flex items-center text-sm text-slate-500 dark:text-slate-400" }, React.createElement("span", { className: "w-2 h-2 rounded-full bg-green-500 mr-2" }), "Active")
+                    )
+                ),
+                React.createElement("button", { onClick: () => setIsAdd(true), className: "border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-3xl p-8 flex flex-col items-center justify-center text-slate-400 hover:text-accent hover:border-accent transition-all" },
+                    React.createElement(Icon, { name: "add", className: "text-5xl mb-4" }),
+                    React.createElement("span", { className: "font-medium text-lg" }, "Add Entity")
+                )
+            ),
+            isAdd && React.createElement("div", { className: "fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50" },
+                React.createElement("div", { className: "glass p-8 rounded-3xl w-96 shadow-2xl" },
+                    React.createElement("h3", { className: "font-bold text-2xl mb-6" }, "New Entity"),
+                    React.createElement("input", { className: "glass-input w-full p-4 rounded-xl mb-6 text-lg", placeholder: "Name", value: name, onChange: e => setName(e.target.value), autoFocus: true }),
+                    React.createElement("div", { className: "flex justify-end gap-3" },
+                        React.createElement("button", { onClick: () => setIsAdd(false), className: "px-6 py-2 rounded-xl hover:bg-black/5" }, "Cancel"),
+                        React.createElement("button", { onClick: create, className: "bg-accent text-white px-8 py-2 rounded-xl shadow-lg" }, "Create")
+                    )
+                )
+            )
+        )
+    );
+};
+
+// --- PERIOD MANAGER ---
+const PeriodManager = ({ entity, onBack, onSelect }) => {
+    const [periods, setPeriods] = useState([]);
+    const [isAdd, setIsAdd] = useState(false);
+    const [newP, setNewP] = useState({ name: '', type: 'Month' });
+
+    const load = async () => {
+        const ps = await db.periods.where('entityId').equals(entity.id).toArray();
+        const withStatus = await Promise.all(ps.map(async p => {
+            const count = await db.trialBalances.where('periodId').equals(p.id).count();
+            return { ...p, hasData: count > 0 };
+        }));
+        setPeriods(withStatus);
+    };
+    useEffect(() => { load(); }, [entity]);
+
+    const add = async () => {
+        if(!newP.name) return;
+        await db.periods.add({ entityId: entity.id, name: newP.name, type: newP.type });
+        setNewP({ name: '', type: 'Month' }); setIsAdd(false); load();
+    };
+
+    const del = async (e, id) => {
+        e.stopPropagation();
+        if(confirm('Delete Period?')) {
+            await db.periods.delete(id);
+            await db.trialBalances.where('periodId').equals(id).delete();
+            load();
+        }
+    };
+
+    const Section = ({ title, items, type }) => (
+        React.createElement("div", { className: "mb-10" },
+            React.createElement("h3", { className: "text-lg font-medium text-slate-400 mb-4 pl-4 border-l-4 border-slate-300" }, title),
+            React.createElement("div", { className: "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6" },
+                items.map(p => 
+                    React.createElement("div", { key: p.id, onClick: () => onSelect(p), className: `p-6 rounded-3xl cursor-pointer relative group border border-white/20 transition ${p.hasData ? 'glass-card' : 'bg-white/10 border-dashed hover:bg-white/20'}` },
+                        React.createElement("button", { onClick: (ev) => del(ev, p.id), className: "absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500" }, React.createElement(Icon, { name: "close" })),
+                        React.createElement("div", { className: "flex justify-between items-start mb-3" },
+                            React.createElement("span", { className: "font-bold text-xl" }, p.name),
+                            p.hasData ? React.createElement(Icon, { name: "check_circle", className: "text-emerald-500" }) : React.createElement(Icon, { name: "upload_file", className: "text-slate-400" })
+                        ),
+                        React.createElement("div", { className: `text-xs font-bold px-2 py-1 rounded-lg w-fit ${p.hasData ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-500/10 text-slate-500'}` }, p.hasData ? "DATA READY" : "NO DATA")
+                    )
+                ),
+                React.createElement("button", { onClick: () => { setNewP(prev => ({...prev, type})); setIsAdd(true); }, className: "border-2 border-dashed border-slate-300/40 rounded-3xl p-4 flex flex-col items-center justify-center text-slate-400 hover:text-accent hover:border-accent transition min-h-[120px]" },
+                    React.createElement(Icon, { name: "add", className: "text-3xl mb-1" }),
+                    React.createElement("span", { className: "text-sm" }, "Add")
+                )
+            )
+        )
+    );
+
+    return React.createElement("div", { className: "min-h-screen p-8" },
+        React.createElement("div", { className: "glass w-full max-w-7xl mx-auto p-10 rounded-[3rem]" },
+            React.createElement("div", { className: "flex items-center gap-6 mb-10" },
+                React.createElement("button", { onClick: onBack, className: "glass-card p-3 rounded-full" }, React.createElement(Icon, { name: "arrow_back" })),
+                React.createElement("div", null,
+                    React.createElement("h1", { className: "text-4xl font-bold" }, entity.name),
+                    React.createElement("p", { className: "text-slate-500" }, "Period Dashboard")
+                )
+            ),
+            React.createElement(Section, { title: "Monthly MIS", items: periods.filter(p => p.type === 'Month'), type: 'Month' }),
+            React.createElement(Section, { title: "Quarterly RBI", items: periods.filter(p => p.type === 'Quarter'), type: 'Quarter' }),
+            React.createElement(Section, { title: "Annual Financials", items: periods.filter(p => p.type === 'Year'), type: 'Year' }),
+            
+            isAdd && React.createElement("div", { className: "fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50" },
+                React.createElement("div", { className: "glass p-8 rounded-3xl w-96 shadow-2xl" },
+                    React.createElement("h3", { className: "font-bold text-2xl mb-6" }, `Add ${newP.type}`),
+                    React.createElement("input", { className: "glass-input w-full p-4 rounded-xl mb-6 text-lg", placeholder: "Name (e.g. April)", value: newP.name, onChange: e => setNewP({...newP, name: e.target.value}), autoFocus: true }),
+                    React.createElement("div", { className: "flex justify-end gap-3" },
+                        React.createElement("button", { onClick: () => setIsAdd(false), className: "px-6 py-2 rounded-xl hover:bg-black/5" }, "Cancel"),
+                        React.createElement("button", { onClick: add, className: "bg-accent text-white px-8 py-2 rounded-xl shadow-lg" }, "Add")
+                    )
+                )
+            )
+        )
+    );
+};
+
+// --- UPLOAD MODAL ---
+const UploadModal = ({ isOpen, onClose, onUpload }) => {
+    if(!isOpen) return null;
+    return React.createElement("div", { className: "fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50" },
+        React.createElement("div", { className: "glass p-10 rounded-[3rem] w-[500px] shadow-2xl" },
+            React.createElement("div", { className: "flex justify-between items-center mb-8" },
+                React.createElement("h2", { className: "text-3xl font-bold" }, "Upload Data"),
+                React.createElement("button", { onClick: onClose }, React.createElement(Icon, { name: "close" }))
+            ),
+            React.createElement("form", { onSubmit: onUpload, className: "space-y-6" },
+                React.createElement("div", { className: "p-6 border-2 border-dashed border-slate-300/50 rounded-3xl hover:bg-white/10 transition" },
+                    React.createElement("label", { className: "block font-bold mb-2 uppercase text-xs tracking-wider" }, "1. Trial Balance"),
+                    React.createElement("input", { type: "file", name: "tb", required: true, className: "block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-white/50 file:text-accent hover:file:bg-white" })
+                ),
+                React.createElement("div", { className: "p-6 border-2 border-dashed border-slate-300/50 rounded-3xl hover:bg-white/10 transition" },
+                    React.createElement("label", { className: "block font-bold mb-2 uppercase text-xs tracking-wider" }, "2. Tally Grouping"),
+                    React.createElement("input", { type: "file", name: "grp", required: true, className: "block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-white/50 file:text-accent hover:file:bg-white" })
+                ),
+                React.createElement("button", { type: "submit", className: "w-full bg-slate-900 text-white py-4 rounded-2xl font-bold text-lg hover:scale-[1.02] transition shadow-xl" }, "Process")
+            )
+        )
+    );
+};
+
+// --- MAPPING ---
+const MappingView = ({ entity, tbData }) => {
+    const [mappings, setMappings] = useState([]);
+    const [filter, setFilter] = useState('all');
+    const [search, setSearch] = useState('');
+    const [selection, setSelection] = useState(new Set());
+    const [bulk, setBulk] = useState({});
+    const fileRef = useRef(null);
+
+    useEffect(() => {
+        const load = async () => {
+            const rawMaps = await db.mappings.where('entityId').equals(entity.id).toArray();
+            const decryptedMaps = await Promise.all(rawMaps.map(async m => {
+                const d = await SecurityService.decrypt(m.data);
+                return d ? { ...d, id: m.id } : null;
+            }));
+            const savedMap = new Map(decryptedMaps.filter(Boolean).map(m => [m.ledger.toLowerCase().trim(), m]));
+            
+            const grpRecord = await db.groupings.where('entityId').equals(entity.id).first();
+            const grpData = grpRecord ? (await SecurityService.decrypt(grpRecord.data)) || [] : [];
+            const grpMap = new Map(grpData.map(g => [g.ledger.toLowerCase().trim(), g.parent]));
+
+            const combined = tbData.map(row => {
+                const key = row.particulars.trim().toLowerCase();
+                const saved = savedMap.get(key);
+                const parent = grpMap.get(key) || '';
+                if(saved) return { ...saved, parentGroup: parent };
+                return { ledger: row.particulars, parentGroup: parent, statement: 'P&L', majorHead: '', bsFileNotes: '', subHead: '', type: 'Expense' };
+            });
+            setMappings(combined);
+        };
+        load();
+    }, [tbData]);
+
+    const save = async () => {
+        const encrypted = await Promise.all(mappings.map(async m => ({
+            entityId: entity.id, ledger: m.ledger, data: await SecurityService.encrypt(m)
+        })));
+        await db.mappings.where('entityId').equals(entity.id).delete();
+        await db.mappings.bulkAdd(encrypted);
+        alert("Saved & Encrypted!");
+    };
+
+    const update = (ledger, field, val) => setMappings(p => p.map(m => m.ledger === ledger ? { ...m, [field]: val } : m));
+    
+    const filtered = mappings.filter(m => {
+        if(filter === 'incomplete' && m.bsFileNotes) return false;
+        if(search && !m.ledger.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+    });
+
+    const applyBulk = () => {
+        setMappings(p => p.map(m => {
+            if(selection.has(m.ledger)) {
+                const u = { ...m };
+                if(bulk.statement) u.statement = bulk.statement;
+                if(bulk.head) u.majorHead = bulk.head;
+                if(bulk.note) { 
+                    u.bsFileNotes = bulk.note;
+                    const s = STATEMENT_STRUCTURE.find(x => x.name === bulk.note);
+                    if(s) { u.type = s.type; u.majorHead = s.majorHead; if(s.subHeads.length===1) u.subHead = s.subHeads[0]; }
+                }
+                return u;
+            }
+            return m;
+        }));
+        setSelection(new Set());
+    };
+
+    return React.createElement("div", { className: "h-full flex flex-col p-6" },
+        React.createElement("div", { className: "glass p-6 rounded-3xl mb-6" },
+            React.createElement("div", { className: "flex justify-between mb-6" },
+                React.createElement("input", { className: "glass-input p-3 rounded-xl w-96", placeholder: "Search...", value: search, onChange: e => setSearch(e.target.value) }),
+                React.createElement("div", { className: "flex gap-3" },
+                    React.createElement("button", { onClick: () => setFilter(filter==='all'?'incomplete':'all'), className: "px-4 py-2 rounded-xl glass-card font-bold text-amber-600" }, filter==='all' ? "Show Incomplete" : "Show All"),
+                    React.createElement("button", { onClick: save, className: "px-6 py-2 rounded-xl bg-slate-900 text-white font-bold shadow-lg" }, "Save Changes")
+                )
+            ),
+            React.createElement("div", { className: "glass-card p-4 rounded-2xl flex items-center gap-4" },
+                React.createElement("span", { className: "font-bold text-sm" }, `${selection.size} Selected`),
+                React.createElement("select", { className: "glass-input p-2 rounded-lg text-sm", onChange: e => setBulk({...bulk, statement: e.target.value}) }, React.createElement("option", { value: "" }, "Statement"), React.createElement("option", { value: "P&L" }, "P&L"), React.createElement("option", { value: "Balance Sheet" }, "Balance Sheet")),
+                React.createElement("select", { className: "glass-input p-2 rounded-lg text-sm", onChange: e => setBulk({...bulk, head: e.target.value}) }, React.createElement("option", { value: "" }, "Major Head"), [...new Set(STATEMENT_STRUCTURE.map(s => s.majorHead))].map(h => React.createElement("option", { key: h, value: h }, h))),
+                React.createElement("select", { className: "glass-input p-2 rounded-lg text-sm", onChange: e => setBulk({...bulk, note: e.target.value}) }, React.createElement("option", { value: "" }, "Note"), STATEMENT_STRUCTURE.map(s => React.createElement("option", { key: s.name, value: s.name }, s.name))),
+                React.createElement("button", { onClick: applyBulk, className: "ml-auto bg-accent text-white px-4 py-2 rounded-xl text-sm font-bold" }, "Apply")
+            )
+        ),
+        React.createElement("div", { className: "glass rounded-3xl flex-1 overflow-hidden border border-white/20" },
+            React.createElement("div", { className: "h-full overflow-auto custom-scroll" },
+                React.createElement("table", { className: "w-full text-sm text-left" },
+                    React.createElement("thead", { className: "sticky top-0 bg-white/80 backdrop-blur-md z-10 font-bold text-xs uppercase text-slate-500" },
+                        React.createElement("tr", null,
+                            React.createElement("th", { className: "p-4 w-12" }, React.createElement("input", { type: "checkbox", onChange: e => setSelection(e.target.checked ? new Set(filtered.map(m => m.ledger)) : new Set()) })),
+                            React.createElement("th", { className: "p-4" }, "Ledger"),
+                            React.createElement("th", { className: "p-4" }, "Statement"),
+                            React.createElement("th", { className: "p-4" }, "Major Head"),
+                            React.createElement("th", { className: "p-4" }, "Note")
+                        )
+                    ),
+                    React.createElement("tbody", { className: "divide-y divide-slate-100" },
+                        filtered.map(m => 
+                            React.createElement("tr", { key: m.ledger, className: `hover:bg-white/30 ${selection.has(m.ledger) ? 'bg-blue-50/50' : !m.bsFileNotes ? 'bg-red-50/30' : ''}` },
+                                React.createElement("td", { className: "p-4" }, React.createElement("input", { type: "checkbox", checked: selection.has(m.ledger), onChange: () => setSelection(p => { const n = new Set(p); n.has(m.ledger) ? n.delete(m.ledger) : n.add(m.ledger); return n; }) })),
+                                React.createElement("td", { className: "p-4 font-medium" }, m.ledger, !m.bsFileNotes && React.createElement("div", { className: "text-xs text-red-500 font-bold" }, "Incomplete")),
+                                React.createElement("td", { className: "p-4" }, 
+                                    React.createElement("select", { className: "glass-input w-full p-2 rounded-lg", value: m.statement||'', onChange: e => update(m.ledger, 'statement', e.target.value) }, React.createElement("option", { value: "P&L" }, "P&L"), React.createElement("option", { value: "Balance Sheet" }, "Balance Sheet"))
+                                ),
+                                React.createElement("td", { className: "p-4" }, 
+                                    React.createElement("select", { className: "glass-input w-full p-2 rounded-lg", value: m.majorHead||'', onChange: e => update(m.ledger, 'majorHead', e.target.value) }, React.createElement("option", { value: "" }, "Select..."), [...new Set(STATEMENT_STRUCTURE.map(s => s.majorHead))].map(h => React.createElement("option", { key: h, value: h }, h)))
+                                ),
+                                React.createElement("td", { className: "p-4" }, 
+                                    React.createElement("select", { className: "glass-input w-full p-2 rounded-lg", value: m.bsFileNotes||'', onChange: e => {
+                                        const s = STATEMENT_STRUCTURE.find(x => x.name === e.target.value);
+                                        update(m.ledger, 'bsFileNotes', e.target.value);
+                                        if(s) { update(m.ledger, 'type', s.type); update(m.ledger, 'majorHead', s.majorHead); update(m.ledger, 'subHead', s.subHeads[0]); }
+                                    } }, React.createElement("option", { value: "" }, "Select..."), STATEMENT_STRUCTURE.map(s => React.createElement("option", { key: s.name, value: s.name }, s.name)))
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
+};
+
+// --- REPORT VIEWER ---
+const ReportViewer = ({ data, columns, onEdit }) => {
+    const [tab, setTab] = useState('bs');
+    const format = (v) => (v===0 || isNaN(v)) ? '-' : v.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+    const Table = ({ rows }) => (
+        React.createElement("table", { className: "w-full text-sm border-collapse" },
+            React.createElement("thead", { className: "bg-slate-50/80 uppercase text-xs text-slate-500 font-bold sticky top-0 backdrop-blur-sm" },
+                React.createElement("tr", null,
+                    React.createElement("th", { className: "p-4 text-left pl-8" }, "Particulars"),
+                    React.createElement("th", { className: "p-4 w-16 text-center" }, "Note"),
+                    columns.map((c, i) => React.createElement("th", { key: i, className: "p-4 text-right" }, c.label))
+                )
+            ),
+            React.createElement("tbody", { className: "divide-y divide-slate-100" },
+                rows.filter(r => r.isHeader || columns.some(c => c.accessor(r) !== 0)).map((r, i) => 
+                    React.createElement("tr", { key: i, className: `hover:bg-white/40 ${r.isHeader && r.level < 1 ? 'font-bold bg-slate-50/50' : ''}` },
+                        React.createElement("td", { className: "p-3 pl-8", style: { paddingLeft: `${(r.level + 1) * 2}rem` } }, r.particulars),
+                        React.createElement("td", { className: "p-3 text-center text-accent font-bold cursor-pointer hover:underline", onClick: () => { if(r.noteNumber) setTab(r.statement==='P&L'?'npl':'nbs'); } }, r.noteNumber),
+                        columns.map((c, j) => React.createElement("td", { key: j, className: `p-3 text-right font-mono ${c.className?c.className(r):''}` }, 
+                            c.editable ? React.createElement("input", { className: "glass-input w-24 text-right p-1 rounded font-mono", value: c.accessor(r), onChange: e => onEdit(r.id, e.target.value) }) : format(c.accessor(r))
+                        ))
+                    )
+                )
+            )
+        )
+    );
+
+    const Notes = ({ notes, title }) => (
+        React.createElement("div", { className: "p-8" },
+            React.createElement("h2", { className: "text-2xl font-bold mb-8 pb-4 border-b border-slate-300/50" }, title),
+            notes.map(n => 
+                React.createElement("div", { key: n.number, className: "glass-card rounded-3xl p-6 mb-10" },
+                    React.createElement("h3", { className: "font-bold text-lg mb-4 ml-2" }, `Note ${n.number}: ${n.title}`),
+                    React.createElement("table", { className: "w-full text-sm" },
+                        React.createElement("thead", { className: "border-b border-slate-200" },
+                            React.createElement("tr", null,
+                                React.createElement("th", { className: "p-3 text-left font-medium text-slate-500" }, "Particulars"),
+                                columns.map((c, i) => React.createElement("th", { key: i, className: "p-3 text-right font-medium text-slate-500" }, c.label))
+                            )
+                        ),
+                        React.createElement("tbody", null,
+                            n.items.map((item, i) => 
+                                React.createElement("tr", { key: i, className: "border-b border-slate-100/50 hover:bg-white/20" },
+                                    React.createElement("td", { className: "p-3 font-medium" }, item.particulars),
+                                    columns.map((c, j) => React.createElement("td", { key: j, className: "p-3 text-right font-mono text-slate-600" }, format(c.accessor(item))))
+                                )
+                            ),
+                            React.createElement("tr", { className: "font-bold bg-slate-50/50" },
+                                React.createElement("td", { className: "p-3" }, "Total"),
+                                columns.map((c, j) => React.createElement("td", { key: j, className: "p-3 text-right font-mono" }, format(c.accessor(n.total))))
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    );
+
+    return React.createElement("div", { className: "flex flex-col h-full" },
+        React.createElement("div", { className: "flex border-b border-white/30 px-6 bg-white/20 backdrop-blur-sm" },
+            ['Balance Sheet', 'P&L', 'Notes BS', 'Notes PL', 'Addl Notes'].map(t => {
+                const k = t === 'Balance Sheet' ? 'bs' : t === 'P&L' ? 'pl' : t === 'Notes BS' ? 'nbs' : t === 'Notes PL' ? 'npl' : 'add';
+                return React.createElement("button", { key: k, onClick: () => setTab(k), className: `px-6 py-4 text-sm font-bold border-b-2 transition-all ${tab===k ? 'border-accent text-accent' : 'border-transparent text-slate-500 hover:text-slate-800'}` }, t);
+            })
+        ),
+        React.createElement("div", { className: "flex-1 overflow-auto p-8 print-container" },
+            React.createElement("div", { className: "glass rounded-[3rem] min-h-full overflow-hidden shadow-sm" },
+                tab === 'bs' && React.createElement(Table, { rows: data.bs }),
+                tab === 'pl' && React.createElement(Table, { rows: data.pnl }),
+                tab === 'nbs' && React.createElement(Notes, { notes: data.notes.filter(n => n.type !== 'Income' && n.type !== 'Expense'), title: "Notes to Balance Sheet" }),
+                tab === 'npl' && React.createElement(Notes, { notes: data.notes.filter(n => n.type === 'Income' || n.type === 'Expense'), title: "Notes to P&L" }),
+                tab === 'add' && React.createElement("div", { className: "p-10 text-center text-slate-400" }, "Additional Manual Notes Module")
+            )
+        )
+    );
+};
+
+// --- CONSOLIDATION VIEW ---
+const ConsolidationView = ({ onBack }) => {
+    const [entities, setEntities] = useState([]);
+    const [selected, setSelected] = useState(new Set());
+    const [report, setReport] = useState(null);
+
+    useEffect(() => { db.entities.toArray().then(setEntities); }, []);
+
+    const generate = async () => {
+        const selectedEntities = entities.filter(e => selected.has(e.id));
+        // Simplified: Gets latest period data for each selected entity
+        const mergedCols = await Promise.all(selectedEntities.map(async e => {
+            const p = await db.periods.where('entityId').equals(e.id).last();
+            if(!p) return { name: e.name, data: null };
+            const tbRaw = (await db.trialBalances.where('periodId').equals(p.id).first())?.data;
+            const tb = tbRaw ? await SecurityService.decrypt(tbRaw) : [];
+            const mapsRaw = await db.mappings.where('entityId').equals(e.id).toArray();
+            const maps = await Promise.all(mapsRaw.map(async m => await SecurityService.decrypt(m.data)));
+            const fin = generateFinancials(tb, maps.filter(Boolean));
+            return { name: e.name, data: fin };
+        }));
+
+        // Merge Logic (Simple Addition for Demo)
+        const base = mergedCols[0]?.data; // Use first structure as base
+        if(!base) return;
+        
+        // Add a 'consolidated' column to base structure
+        const enrich = (rows) => rows.map(r => {
+            const vals = mergedCols.map(c => {
+                const match = (type === 'bs' ? c.data?.bs : c.data?.pnl)?.find(x => x.id === r.id);
+                return match ? match.currentAmount : 0;
+            });
+            return { ...r, values: vals, total: vals.reduce((a,b)=>a+b,0) };
+        });
+        
+        setReport({ 
+            bs: enrich(base.bs), pnl: enrich(base.pnl), notes: [],
+            columns: mergedCols.map((c, i) => ({ label: c.name, accessor: r => r.values[i] })).concat([{ label: 'Total', accessor: r => r.total, className: () => 'font-bold' }])
+        });
+    };
+
+    if(report) return React.createElement("div", { className: "h-full flex flex-col" },
+        React.createElement("div", { className: "p-4 bg-white/50 flex items-center" },
+            React.createElement("button", { onClick: () => setReport(null), className: "flex items-center gap-2 font-bold text-slate-600" }, React.createElement(Icon, { name: "arrow_back" }), "Back to Selection"),
+            React.createElement("h2", { className: "ml-6 text-xl font-bold" }, "Consolidated Report")
+        ),
+        React.createElement("div", { className: "flex-1 overflow-hidden" },
+            React.createElement(ReportViewer, { data: report, columns: report.columns, onEdit: () => {} })
+        )
+    );
+
+    return React.createElement("div", { className: "p-10 h-screen flex flex-col items-center justify-center" },
+        React.createElement("div", { className: "glass p-12 rounded-[3rem] max-w-3xl w-full" },
+            React.createElement("div", { className: "flex items-center mb-8" },
+                React.createElement("button", { onClick: onBack, className: "p-3 rounded-full hover:bg-white/50" }, React.createElement(Icon, { name: "arrow_back" })),
+                React.createElement("h2", { className: "text-3xl font-bold ml-4" }, "Consolidate Entities")
+            ),
+            React.createElement("div", { className: "space-y-4 mb-8" },
+                entities.map(e => 
+                    React.createElement("div", { key: e.id, onClick: () => setSelected(p => { const n = new Set(p); n.has(e.id)?n.delete(e.id):n.add(e.id); return n; }), className: `p-6 rounded-2xl cursor-pointer border transition flex items-center justify-between ${selected.has(e.id) ? 'bg-accent text-white border-transparent shadow-lg transform scale-105' : 'bg-white/30 border-white/40 hover:bg-white/50'}` },
+                        React.createElement("span", { className: "font-bold text-lg" }, e.name),
+                        selected.has(e.id) && React.createElement(Icon, { name: "check_circle" })
+                    )
+                )
+            ),
+            React.createElement("button", { onClick: generate, disabled: selected.size < 2, className: "w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg disabled:opacity-50 hover:scale-[1.02] transition shadow-xl" }, "Generate Report")
+        )
+    );
+};
+
+// --- WORKSPACE ---
+const Workspace = ({ entity, period, onBack }) => {
+    const [view, setView] = useState('mapping');
+    const [tbData, setTbData] = useState([]);
+    const [reportData, setReportData] = useState(null);
+    const [budgetData, setBudgetData] = useState({});
+    const [uploadOpen, setUploadOpen] = useState(!period.hasData);
+    const [isBudgetEdit, setIsBudgetEdit] = useState(false);
+
+    const load = useCallback(async () => {
+        const rawTB = (await db.trialBalances.where('periodId').equals(period.id).first())?.data;
+        const tb = rawTB ? await SecurityService.decrypt(rawTB) : [];
+        setTbData(tb);
+
+        const rawMaps = await db.mappings.where('entityId').equals(entity.id).toArray();
+        const maps = await Promise.all(rawMaps.map(async m => await SecurityService.decrypt(m.data)));
+        
+        if(tb.length) setReportData(generateFinancials(tb, maps.filter(Boolean)));
+        
+        const rawBud = (await db.budgets.where({ entityId: entity.id, periodId: period.id }).first())?.data;
+        if(rawBud) setBudgetData(await SecurityService.decrypt(rawBud));
+    }, [entity, period]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const handleUpload = async (e) => {
+        e.preventDefault();
+        const tbFile = e.target.tb.files[0];
+        const grpFile = e.target.grp.files[0];
+        
+        const read = f => new Promise(r => { const rd = new FileReader(); rd.onload = e => r(new Uint8Array(e.target.result)); rd.readAsArrayBuffer(f); });
+        const tbJ = XLSX.utils.sheet_to_json(XLSX.read(await read(tbFile)).Sheets[XLSX.read(await read(tbFile)).SheetNames[0]]);
+        const grpJ = XLSX.utils.sheet_to_json(XLSX.read(await read(grpFile)).Sheets[XLSX.read(await read(grpFile)).SheetNames[0]]);
+
+        const encGrp = await SecurityService.encrypt(grpJ.map(r => ({ ledger: r['Ledger']||Object.values(r)[0], parent: r['Parent']||Object.values(r)[1] })));
+        await db.groupings.where('entityId').equals(entity.id).delete();
+        await db.groupings.add({ entityId: entity.id, data: encGrp });
+
+        const cleanTB = tbJ.map(r => ({ particulars: r['Particulars'], opening: Number(r['Opening'])||0, debit: Number(r['Debit'])||0, credit: Number(r['Credit'])||0, closing: Number(r['Closing'])||0 })).filter(r => r.particulars);
+        const encTB = await SecurityService.encrypt(cleanTB);
+        await db.trialBalances.where('periodId').equals(period.id).delete();
+        await db.trialBalances.add({ periodId: period.id, data: encTB });
+        
+        alert('Uploaded & Encrypted!'); setUploadOpen(false); load();
+    };
+
+    const saveBudget = async () => {
+        const enc = await SecurityService.encrypt(budgetData);
+        await db.budgets.where({ entityId: entity.id, periodId: period.id }).delete();
+        await db.budgets.add({ entityId: entity.id, periodId: period.id, data: enc });
+        setIsBudgetEdit(false);
+    };
+
+    const budgetCols = [
+        { label: 'Budget', accessor: r => budgetData[r.id] || 0, editable: isBudgetEdit },
+        { label: 'Actual', accessor: r => r.current },
+        { label: 'Variance', accessor: r => (budgetData[r.id]||0) - r.current, className: r => (budgetData[r.id]||0)-r.current < 0 ? 'text-red-500 font-bold' : 'text-green-500 font-bold' }
+    ];
+
+    const rbiCols = [ { label: 'Q1', accessor: r => r.current }, { label: 'Q2', accessor: () => 0 }, { label: 'Q3', accessor: () => 0 }, { label: 'Q4', accessor: () => 0 } ];
+
+    return React.createElement("div", { className: "flex flex-col h-screen" },
+        React.createElement("div", { className: "bg-white/60 backdrop-blur-md px-8 py-4 flex justify-between items-center z-20 border-b border-white/40" },
+            React.createElement("div", { className: "flex items-center gap-6" },
+                React.createElement("button", { onClick: onBack, className: "p-2 rounded-full hover:bg-white/50" }, React.createElement(Icon, { name: "arrow_back" })),
+                React.createElement("div", null,
+                    React.createElement("div", { className: "text-xs font-bold text-slate-400 uppercase tracking-widest" }, entity.name),
+                    React.createElement("div", { className: "text-xl font-bold text-slate-800" }, period.name)
+                )
+            ),
+            React.createElement("div", { className: "flex bg-slate-200/50 p-1.5 rounded-2xl" },
+                ['Mapping', 'MIS', 'Financial', 'RBI', 'Budget'].map(m => React.createElement("button", { key: m, onClick: () => setView(m.toLowerCase()), className: `px-6 py-2 text-sm font-bold rounded-xl transition-all ${view===m.toLowerCase() ? 'bg-white text-accent shadow-md' : 'text-slate-500 hover:text-slate-800'}` }, m))
+            ),
+            React.createElement("div", { className: "flex gap-2" },
+                view === 'budget' && (isBudgetEdit 
+                    ? React.createElement("button", { onClick: saveBudget, className: "bg-green-500 text-white px-4 py-2 rounded-xl font-bold shadow-lg" }, "Save Budget")
+                    : React.createElement("button", { onClick: () => setIsBudgetEdit(true), className: "bg-slate-800 text-white px-4 py-2 rounded-xl font-bold shadow-lg" }, "Edit Budget")
+                ),
+                React.createElement("button", { onClick: () => setUploadOpen(true), className: "glass-card px-4 py-2 rounded-xl font-bold text-slate-600 flex items-center gap-2" }, React.createElement(Icon, { name: "upload" }), "Upload")
+            )
+        ),
+        React.createElement("div", { className: "flex-1 overflow-hidden relative" },
+            view === 'mapping' && React.createElement(MappingView, { entity, tbData }),
+            view === 'financial' && reportData && React.createElement(ReportViewer, { data: reportData, columns: [{ label: period.name, accessor: r => r.current }, { label: 'Previous', accessor: r => r.previous }], onEdit: () => {} }),
+            view === 'mis' && reportData && React.createElement(ReportViewer, { data: reportData, columns: [{ label: 'Current', accessor: r => r.current }], onEdit: () => {} }),
+            view === 'rbi' && reportData && React.createElement(ReportViewer, { data: reportData, columns: rbiCols, onEdit: () => {} }),
+            view === 'budget' && reportData && React.createElement(ReportViewer, { data: reportData, columns: budgetCols, onEdit: (id, val) => setBudgetData(p => ({...p, [id]: Number(val)})) })
+        ),
+        React.createElement(UploadModal, { isOpen: uploadOpen, onClose: () => setUploadOpen(false), onUpload: handleUpload })
+    );
+};
+
+// --- APP ---
+const App = () => {
+    const [view, setView] = useState('landing');
+    const [entity, setEntity] = useState(null);
+    const [period, setPeriod] = useState(null);
+    const [dark, setDark] = useState(false);
+
+    const toggleTheme = () => {
+        setDark(!dark);
+        document.documentElement.classList.toggle('dark');
+    };
+
+    return React.createElement("div", { className: "h-full" },
+        React.createElement("button", { onClick: toggleTheme, className: "fixed bottom-6 right-6 p-4 rounded-full glass shadow-2xl z-50 hover:scale-110 transition" }, React.createElement(Icon, { name: dark ? "light_mode" : "dark_mode" })),
+        view === 'landing' && React.createElement(EntitySelector, { onSelect: e => { setEntity(e); setView('periods'); }, onConsolidate: () => setView('consolidate') }),
+        view === 'periods' && React.createElement(PeriodManager, { entity, onBack: () => setView('landing'), onSelect: p => { setPeriod(p); setView('workspace'); } }),
+        view === 'workspace' && React.createElement(Workspace, { entity, period, onBack: () => setView('periods') }),
+        view === 'consolidate' && React.createElement(ConsolidationView, { onBack: () => setView('landing') })
+    );
+};
+
+// --- LOGIC HELPER ---
+const generateFinancials = (tb, mappings, prevTb=[]) => {
+    const norm = s => String(s||'').trim().toLowerCase();
+    const mapDict = new Map(mappings.map(m => [norm(m.ledger), m]));
+    const data = {};
+
+    const process = (rows, isPrev) => {
+        rows.forEach(r => {
+            const m = mapDict.get(norm(r.particulars));
+            const key = m?.bsFileNotes || 'Unmapped';
+            const type = m?.type || 'Expense';
+            const stmt = m?.statement || 'P&L';
+            if(!data[key]) data[key] = { current:0, previous:0, ledgers:[], type, statement: stmt };
+            const val = (r.closing||0) * ((type==='Liability'||type==='Income'||type==='Equity')?-1:1);
+            if(isPrev) data[key].previous += val; else data[key].current += val;
+            
+            const exist = data[key].ledgers.find(l => l.particulars === r.particulars);
+            if(exist) { if(isPrev) exist.previous = val; else exist.current = val; }
+            else data[key].ledgers.push({ particulars: r.particulars, current: isPrev?0:val, previous: isPrev?val:0 });
+        });
+    };
+    process(tb, false); process(prevTb, true);
+
+    const calc = (struct) => {
+        const out = JSON.parse(JSON.stringify(struct));
+        const vals = { current:{}, previous:{} };
+        out.forEach(i => {
+            if(i.noteKey) { i.current = data[i.noteKey]?.current||0; i.previous = data[i.noteKey]?.previous||0; }
+            if(!i.isTotal) { vals.current[i.id] = i.current; vals.previous[i.id] = i.previous; }
+        });
+        out.forEach(i => {
+            if(i.isTotal) {
+                if(i.children) {
+                    i.current = i.children.reduce((s,c) => s+(vals.current[c]||0), 0);
+                    i.previous = i.children.reduce((s,c) => s+(vals.previous[c]||0), 0);
+                } else if(i.calc) {
+                    i.current = i.calc(vals.current); i.previous = i.calc(vals.previous);
+                }
+                vals.current[i.id] = i.current; vals.previous[i.id] = i.previous;
+            }
+        });
+        return out;
+    }
+    
+    const pnl = calc(PNL_STRUCTURE);
+    const bs = calc(BS_STRUCTURE);
+    const notes = [];
+    let nIdx = 1;
+    [...pnl, ...bs].forEach(l => {
+        if(l.noteKey && data[l.noteKey] && data[l.noteKey].ledgers.length) {
+            l.noteNumber = nIdx++;
+            const grp = data[l.noteKey];
+            notes.push({ number: l.noteNumber, title: l.noteKey, items: grp.ledgers, total: { current: grp.current, previous: grp.previous }, type: grp.type });
+        }
+    });
+    return { pnl, bs, notes };
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+// ]]>
+  </script>
+</body>
+</html>
